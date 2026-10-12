@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="uz" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#2563eb" />
+    <title>GEF_system</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%232563eb'/%3E%3Ctext x='16' y='46' font-size='44' font-family='Arial' font-weight='bold' fill='white'%3EG%3C/text%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css" />
+    <link rel="stylesheet" href="/static/css/style.css" />
+  </head>
+  <body>
+    <svg
+      aria-hidden="true"
+      style="position: absolute; width: 0; height: 0; overflow: hidden"
+    >
+      <defs>
+        <symbol id="i-home" viewBox="0 0 24 24">
+          <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z" />
+        </symbol>
+        <symbol id="i-heart" viewBox="0 0 24 24">
+          <path
+            d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"
+          />
+        </symbol>
+        <symbol id="i-spark" viewBox="0 0 24 24">
+          <path
+            d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4zM20 3v4m-2-2h4"
+          />
+        </symbol>
+        <symbol id="i-user" viewBox="0 0 24 24">
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
+        </symbol>
+        <symbol id="i-fuel" viewBox="0 0 24 24">
+          <path
+            d="M3 21h12M5 21V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v17M5 10h8m2-3h2l3 3v7a2 2 0 0 1-4 0v-4h-3m6-5 2-2"
+          />
+          <path d="M8 6h2" />
+        </symbol>
+        <symbol id="i-flame" viewBox="0 0 24 24">
+          <path
+            d="M12 2c1 6-4 7-4 11 0 3 2 5 4 5-1-3 2-4 2-6 2 2 3 4 2 7 3-2 5-5 3-9-1 1-2 2-3 2 0-5-2-7-4-10zM7 9c-3 3-4 6-2 9 3 5 11 5 14 0"
+          />
+        </symbol>
+        <symbol id="i-bolt" viewBox="0 0 24 24">
+          <path d="m13 2-9 12h7l-1 8 10-13h-7z" />
+        </symbol>
+        <symbol id="i-pin" viewBox="0 0 24 24">
+          <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z" />
+          <circle cx="12" cy="10" r="2.5" />
+        </symbol>
+        <symbol id="i-gps" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="6" />
+          <circle cx="12" cy="12" r="2" />
+          <path d="M12 2v4m0 12v4M2 12h4m12 0h4" />
+        </symbol>
+        <symbol id="i-route" viewBox="0 0 24 24">
+          <path d="m12 3 9 18-9-5-9 5z" />
+        </symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24">
+          <path d="M4 12h16m-6-6 6 6-6 6" />
+        </symbol>
+        <symbol id="i-back" viewBox="0 0 24 24">
+          <path d="M20 12H4m6-6-6 6 6 6" />
+        </symbol>
+        <symbol id="i-search" viewBox="0 0 24 24">
+          <circle cx="10.5" cy="10.5" r="6.5" />
+          <path d="m16 16 5 5" />
+        </symbol>
+        <symbol id="i-clock" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </symbol>
+        <symbol id="i-coin" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M15 8h-4a2 2 0 0 0 0 4h2a2 2 0 0 1 0 4H9m3-10v2m0 8v2" />
+        </symbol>
+        <symbol id="i-moon" viewBox="0 0 24 24">
+          <path d="M20 14A8 8 0 0 1 10 4a9 9 0 1 0 10 10z" />
+        </symbol>
+        <symbol id="i-sun" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="4" />
+          <path
+            d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1 1m12 12 1 1M19 5l-1 1M6 18l-1 1"
+          />
+        </symbol>
+        <symbol id="i-settings" viewBox="0 0 24 24">
+          <path
+            d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 2-1 2 4h3l1-3 3-1 2-3-2-2 1-3-3-2-2 1-2-4z"
+          />
+          <circle cx="12" cy="12" r="3" />
+        </symbol>
+        <symbol id="i-support" viewBox="0 0 24 24">
+          <path
+            d="M4 14v-3a8 8 0 0 1 16 0v3M4 12H2v6h5v-6zm16 0h2v6h-5v-6zM20 18v1c0 2-3 3-6 3"
+          />
+        </symbol>
+        <symbol id="i-send" viewBox="0 0 24 24">
+          <path d="m22 2-7 20-4-9-9-4zM11 13 22 2" />
+        </symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24">
+          <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7" />
+        </symbol>
+        <symbol id="i-edit" viewBox="0 0 24 24">
+          <path d="m16 3 5 5-12 12H4v-5zM13 6l5 5" />
+        </symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24">
+          <path d="M12 4v16M4 12h16" />
+        </symbol>
+        <symbol id="i-close" viewBox="0 0 24 24">
+          <path d="m6 6 12 12M6 18 18 6" />
+        </symbol>
+        <symbol id="i-shield" viewBox="0 0 24 24">
+          <path d="m12 2 9 4v6c0 6-9 10-9 10S3 18 3 12V6zM8 12l3 3 5-6" />
+        </symbol>
+        <symbol id="i-logout" viewBox="0 0 24 24">
+          <path d="M9 3H4v18h5m4-9h9m-4-4 4 4-4 4" />
+        </symbol>
+      </defs>
+    </svg>
+    <div id="loading" class="loading" role="status">
+      <span class="brand-g">G</span>
+      <h2>GEF_system</h2>
+      <span class="spinner" id="boot-spinner"></span>
+      <p id="boot-message" class="muted">Yuklanmoqda…</p>
+      <button id="boot-retry" class="btn primary hidden">Qayta urinish</button>
+    </div>
+    <aside class="sidebar">
+      <a class="brand" href="#home"
+        ><span class="brand-g">G</span>
+        <div>
+          GEF_system
+          <div class="brand-sub" data-t="brand_sub"></div></div
+      ></a>
+      <nav class="nav-list" id="desktop-nav"></nav>
+      <div class="sidebar-end">
+        <button
+          class="nav-item hidden full"
+          data-action="admin"
+          id="admin-link"
+        >
+          <svg class="icon"><use href="#i-shield" /></svg
+          ><span data-t="administrator"></span>
+        </button>
+        <div class="sidebar-note">
+          <div class="row">
+            <svg class="icon"><use href="#i-route" /></svg
+            ><strong data-t="side_title"></strong>
+          </div>
+          <p data-t="side_note" style="margin: 8px 0 0"></p>
+        </div>
+        <div
+          class="side-account"
+          data-action="page"
+          data-page="profile"
+          id="side-account"
+        ></div>
+      </div>
+    </aside>
+    <main class="main">
+      <div class="workspace">
+        <header class="topbar">
+          <div class="topbar-left" data-t="top_greeting"></div>
+          <a href="#home" class="mobile-brand"
+            ><span class="brand-g">G</span
+            ><span style="color: var(--text)">GEF_system</span></a
+          >
+          <div class="topbar-controls">
+            <select class="lang-control" id="language" aria-label="Language">
+              <option value="uz">UZB</option>
+              <option value="ru">RU</option>
+              <option value="en">ENG</option></select
+            ><button
+              class="icon-btn"
+              id="theme-toggle"
+              data-action="theme"
+            ></button
+            ><button
+              class="icon-btn"
+              data-action="page"
+              data-page="profile"
+              data-title="profile"
+            >
+              <svg class="icon"><use href="#i-user" /></svg>
+            </button>
+          </div>
+        </header>
+        <div id="navigation" class="nav-strip hidden" aria-live="polite"></div>
+        <section id="page-home">
+          <div class="heading">
+            <div class="eyebrow" data-t="home_eyebrow"></div>
+            <h1 data-t="home_title"></h1>
+            <p data-t="home_subtitle"></p>
+          </div>
+          <div
+            class="demo-banner hidden"
+            id="demo-banner"
+            data-t="demo_notice"
+          ></div>
+          <div class="panel map-panel">
+            <div class="row location-head">
+              <svg class="icon"><use href="#i-pin" /></svg>
+              <div class="grow">
+                <strong id="location-text" class="location-text"></strong>
+                <div id="location-status" class="location-status"></div>
+              </div>
+              <button
+                class="btn small"
+                data-action="manual"
+                data-t="manual_point"
+              ></button>
+            </div>
+            <div class="map-wrap">
+              <div class="map" id="map"></div>
+              <div class="map-overlay top">
+                <span
+                  class="badge"
+                  style="
+                    background: var(--surface);
+                    box-shadow: 0 2px 10px #0001;
+                  "
+                  id="map-count"
+                ></span>
+              </div>
+              <div class="map-overlay gps">
+                <button
+                  class="icon-btn gps-btn"
+                  data-action="locate"
+                  data-title="locate"
+                >
+                  <svg class="icon"><use href="#i-gps" /></svg>
+                </button>
+              </div>
+              <div class="map-status hidden" id="map-status"></div>
+              <div class="map-error hidden" id="map-error"></div>
+            </div>
+          </div>
+          <div class="categories" id="categories"></div>
+          <div class="section-head">
+            <div>
+              <h2 id="results-title" style="margin-bottom: 3px"></h2>
+              <small id="results-count"></small>
+            </div>
+            <select id="grade" class="grade-select" aria-label="Petrol grade">
+              <option>AI-80</option>
+              <option>AI-90</option>
+              <option>AI-95</option>
+            </select>
+          </div>
+          <div class="results-toolbar">
+            <div class="filters">
+              <button
+                class="btn filter"
+                data-action="sort"
+                data-sort="price"
+                id="filter-price"
+              >
+                <svg class="icon"><use href="#i-coin" /></svg
+                ><span data-t="cheapest"></span></button
+              ><button
+                class="btn filter"
+                data-action="sort"
+                data-sort="distance"
+                id="filter-distance"
+              >
+                <svg class="icon"><use href="#i-route" /></svg
+                ><span data-t="nearest"></span></button
+              ><button
+                class="btn filter"
+                data-action="open"
+                id="filter-open"
+                aria-pressed="false"
+              >
+                <span class="dot" style="color: var(--green)"></span
+                ><span data-t="open_filter"></span></button
+              ><button
+                class="filter-clear"
+                data-action="clear"
+                data-t="clear"
+              ></button>
+            </div>
+            <div class="search-field">
+              <svg class="icon"><use href="#i-search" /></svg
+              ><input
+                id="station-search"
+                data-placeholder="search_stations"
+                autocomplete="off"
+              />
+            </div>
+          </div>
+          <div id="results" class="cards"></div>
+          <div id="pagination" class="pagination"></div>
+        </section>
+        <section id="page-favorites" class="hidden"></section>
+        <section id="page-ai" class="hidden"></section>
+        <section id="page-profile" class="hidden"></section>
+        <section id="page-admin" class="hidden"></section>
+        <footer
+          style="
+            margin-top: 30px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            justify-content: center;
+          "
+        >
+          <span style="color: var(--muted); font-size: 10px">GEF_system</span
+          ><span style="color: var(--line)">·</span
+          ><small data-t="footer" style="font-size: 10px"></small>
+        </footer>
+      </div>
+    </main>
+    <nav class="mobile-nav" id="mobile-nav"></nav>
+    <dialog id="modal">
+      <div class="row between dialog-head">
+        <h2 id="modal-title"></h2>
+        <button class="icon-btn" data-action="close-modal" data-title="close">
+          <svg class="icon"><use href="#i-close" /></svg>
+        </button>
+      </div>
+      <div id="modal-content"></div>
+    </dialog>
+    <div id="toast" class="toast hidden" role="status"></div>
+    <script src="/static/vendor/leaflet/leaflet.js"></script>
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>
