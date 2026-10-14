@@ -136,6 +136,34 @@ python3 app.py test
 Testlar mustaqil xotira databaseida bajariladi. Ro‘yxatdan o‘tish, profil,
 parol tiklash, admin, stansiyalar, sevimlilar, tashrif/rating, AI javoblari,
 avatar va ajratilgan frontend fayllari tekshiriladi.
+## Railway orqali deploy qilish
+
+Loyiha Railway uchun to‘liq sozlangan (`railway.json`, `Procfile`, `start.sh`, `nixpacks.toml`).
+
+1. GitHubga barcha o‘zgarishlarni push qiling:
+   ```bash
+   git add .
+   git commit -m "Configure Railway & Vercel deployment"
+   git push origin main
+   ```
+2. [Railway.app](https://railway.app) ga kiring:
+   - **New Project** -> **Deploy from GitHub repo** -> `GEF_system` reposini tanlang.
+3. **Sayt havolasini olish (Domain yaratish)**:
+   - Railway servisga standart bo‘yicha avtomatik ommaviy domen bermaydi, shuning uchun havola ko‘rinmaydi.
+   - Railway panelida servisingiz (`GEF_system`) ustiga bosing -> **Settings** bo‘limiga o‘ting.
+   - **Networking** bo‘limida **Generate Domain** tugmasini bosing.
+   - Shu zahoti `...up.railway.app` havolasi yaratiladi va sayt ochiladi.
+4. **Administrator va sozlamalar (Variables)** (ixtiyoriy):
+   - `GEF_ADMIN_USER` va `GEF_ADMIN_PASSWORD`: agar kiritilsa, admin hisobi avtomatik yaratiladi.
+   - `DATABASE_URL`: PostgreSQL qo‘shilsa (Railway -> New -> Database -> PostgreSQL), Railway uni avtomatik bog‘laydi. Belgilanmasa SQLite ishlaydi.
+
+## Vercel orqali deploy qilish
+
+Loyiha Vercel serverless muhiti uchun ham moslashtirilgan (`vercel.json`).
+
+1. GitHub reposini [Vercel.com](https://vercel.com) ga import qiling:
+   - **Add New Project** -> `GEF_system`ni tanlang -> **Deploy**.
+2. Vercelda fayllar tizimi serverless bo‘lgani uchun ma’lumotlar vaqtinchalik saqlanadi. Doimiy ma’lumotlar uchun tashqi PostgreSQL (masalan Neon yoki Supabase) ulab, Vercel **Environment Variables** ga `DATABASE_URL` qo‘shish tavsiya etiladi.
 
 ## Production server
 

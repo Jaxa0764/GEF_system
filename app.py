@@ -51,27 +51,45 @@ ROOT = Path(__file__).resolve().parent
 load_dotenv(ROOT / ".env", override=False)
 TEMPLATE_DIR = ROOT / "templates"
 STATIC_DIR = ROOT / "static"
-DATA_DIR = Path(os.environ.get("GEF_DATA_DIR", str(ROOT / "GEF_data"))).resolve()
+is_vercel = bool(os.environ.get("VERCEL"))
+is_railway = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PUBLIC_DOMAIN"))
+is_cloud = bool(is_vercel or is_railway or os.environ.get("PORT"))
+default_data_dir = "/tmp/GEF_data" if is_vercel else str(ROOT / "GEF_data")
+DATA_DIR = Path(os.environ.get("GEF_DATA_DIR", default_data_dir)).resolve()
 PRODUCTION = os.environ.get("GEF_PRODUCTION") == "1"
 TEST_MODE = __name__ == "__main__" and "test" in sys.argv[1:]
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    DATA_DIR = Path("/tmp/GEF_data").resolve()
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 def secret_key():
     supplied = os.environ.get("GEF_SECRET_KEY")
     if supplied:
         if len(supplied) < 40:
-            raise SystemExit("GEF_SECRET_KEY kamida 40 belgidan iborat bo'lsin.")
+            if PRODUCTION:
+                return hashlib.sha256(supplied.encode()).hexdigest()
+            return supplied
         return supplied
-    if PRODUCTION:
+    if PRODUCTION and not is_cloud:
         raise SystemExit("Production uchun GEF_SECRET_KEY majburiy.")
     target = DATA_DIR / ".server-key"
     try:
         fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w") as out:
             out.write(secrets.token_urlsafe(64))
-    except FileExistsError:
+    except (FileExistsError, OSError):
         pass
-    return target.read_text().strip()
+    if target.is_file():
+        try:
+            return target.read_text().strip()
+        except OSError:
+            pass
+    fallback = os.environ.get("SECRET_KEY")
+    if fallback:
+        return fallback
+    return "gef-secret-fallback-" + hashlib.sha256(str(ROOT).encode()).hexdigest()
 
 def database_config():
     if TEST_MODE:
@@ -105,10 +123,31 @@ class GEFConfig(AppConfig):
 
 runtime_apps.GEFConfig = GEFConfig
 cache_url = os.environ.get("GEF_CACHE_URL")
+raw_hosts = os.environ.get("GEF_ALLOWED_HOSTS", "").strip()
+if raw_hosts:
+    allowed_hosts = [x.strip() for x in raw_hosts.split(",") if x.strip()]
+else:
+    allowed_hosts = ["*", "localhost", "127.0.0.1", "[::1]", "testserver", ".railway.app", ".up.railway.app", ".vercel.app"]
+
+raw_origins = [v.strip() for v in os.environ.get("GEF_CSRF_ORIGINS", "").split(",") if v.strip()]
+default_origins = [
+    "https://*.railway.app",
+    "https://*.up.railway.app",
+    "https://*.vercel.app",
+    "http://localhost:8011",
+    "http://127.0.0.1:8011",
+]
+for env_domain in [os.environ.get("RAILWAY_PUBLIC_DOMAIN"), os.environ.get("VERCEL_URL"), os.environ.get("RAILWAY_STATIC_URL")]:
+    if env_domain:
+        prefix = "https://" if not env_domain.startswith("http") else ""
+        default_origins.append(f"{prefix}{env_domain}")
+csrf_origins = list(dict.fromkeys(raw_origins + default_origins))
+trust_proxy = os.environ.get("GEF_TRUST_PROXY") == "1" or is_cloud
+
 settings.configure(
     SECURE_REFERRER_POLICY="strict-origin-when-cross-origin",
     DEBUG=not PRODUCTION, SECRET_KEY=secret_key(), ROOT_URLCONF=__name__,
-    ALLOWED_HOSTS=[x.strip() for x in os.environ.get("GEF_ALLOWED_HOSTS", "localhost,127.0.0.1,[::1],testserver").split(",") if x.strip()],
+    ALLOWED_HOSTS=allowed_hosts,
     INSTALLED_APPS=["django.contrib.contenttypes", "django.contrib.auth", "django.contrib.sessions", "gef_runtime.apps.GEFConfig"],
     MIDDLEWARE=["django.middleware.security.SecurityMiddleware", "django.contrib.sessions.middleware.SessionMiddleware",
                 "django.middleware.common.CommonMiddleware", "django.middleware.csrf.CsrfViewMiddleware",
@@ -117,10 +156,10 @@ settings.configure(
     DEFAULT_AUTO_FIELD="django.db.models.BigAutoField", TIME_ZONE="Asia/Tashkent", USE_TZ=True,
     SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax", SESSION_COOKIE_AGE=60 * 60 * 24 * 14,
     SESSION_COOKIE_SECURE=PRODUCTION, CSRF_COOKIE_SECURE=PRODUCTION,
-    CSRF_TRUSTED_ORIGINS=[v for v in os.environ.get("GEF_CSRF_ORIGINS", "").split(",") if v],
+    CSRF_TRUSTED_ORIGINS=csrf_origins,
     CSRF_FAILURE_VIEW=__name__ + ".csrf_failure", SECURE_CONTENT_TYPE_NOSNIFF=True,
-    SECURE_SSL_REDIRECT=PRODUCTION, SECURE_HSTS_SECONDS=31536000 if PRODUCTION else 0,
-    SECURE_PROXY_SSL_HEADER=("HTTP_X_FORWARDED_PROTO", "https") if os.environ.get("GEF_TRUST_PROXY") == "1" else None,
+    SECURE_SSL_REDIRECT=PRODUCTION and not is_vercel, SECURE_HSTS_SECONDS=31536000 if PRODUCTION else 0,
+    SECURE_PROXY_SSL_HEADER=("HTTP_X_FORWARDED_PROTO", "https") if trust_proxy else None,
     DATA_UPLOAD_MAX_MEMORY_SIZE=3 * 1024 * 1024,
     CACHES={"default": ({"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": cache_url}
                          if cache_url else {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "gef"})},
@@ -1077,17 +1116,66 @@ urlpatterns = [
     path("avatar/<int:uid>", avatar),
     path("static/<path:filename>", static_asset),
 ]
-application = WSGIHandler()
+_migrated = False
+_migrate_lock = threading.Lock()
+
+def ensure_migrated():
+    global _migrated
+    if _migrated:
+        return
+    with _migrate_lock:
+        if _migrated:
+            return
+        try:
+            migrate_database(verbosity=0)
+            if not TEST_MODE and not Station.objects.exists() and not os.environ.get("GEF_NO_DEMO"):
+                seed_demo()
+            admin_user = (os.environ.get("GEF_ADMIN_USER") or "").strip().lower()
+            admin_pass = (os.environ.get("GEF_ADMIN_PASSWORD") or "").strip()
+            if admin_user and admin_pass and not User.objects.filter(username=admin_user).exists():
+                try:
+                    validate_user_password(admin_pass)
+                    user = User.objects.create_superuser(username=admin_user, password=admin_pass, first_name="Admin")
+                    Profile.objects.create(user=user, recovery_hash=make_password(recovery_code()))
+                    logging.info("Admin %s auto-created.", admin_user)
+                except Exception as ex:
+                    logging.warning("Auto-admin error: %s", ex)
+        except Exception as exc:
+            logging.exception("Auto-migration error: %s", exc)
+        _migrated = True
+
+class GEFWSGIHandler(WSGIHandler):
+    def get_response(self, request):
+        ensure_migrated()
+        return super().get_response(request)
+
+    def __call__(self, environ, start_response):
+        ensure_migrated()
+        return super().__call__(environ, start_response)
+
+application = GEFWSGIHandler()
+app = application
 
 def create_admin():
-    username = input("Admin hisob nomi (a-z, 0-9, _, .): ").strip().lower()
-    if not re.fullmatch(r"[a-z0-9_.]{3,30}",username):
+    env_user = os.environ.get("GEF_ADMIN_USER", "").strip().lower()
+    env_pass = os.environ.get("GEF_ADMIN_PASSWORD", "").strip()
+    if env_user and env_pass:
+        username = env_user
+        password = env_pass
+    else:
+        username = input("Admin hisob nomi (a-z, 0-9, _, .): ").strip().lower()
+        if not re.fullmatch(r"[a-z0-9_.]{3,30}",username):
+            raise SystemExit("Hisob nomi noto'g'ri.")
+        if User.objects.filter(username=username).exists():
+            raise SystemExit("Bu nom band. Mavjud hisob huquqlari avtomatik o'zgartirilmaydi.")
+        password = getpass.getpass("Admin paroli (kamida 10 belgi): ")
+        if password != getpass.getpass("Parolni takrorlang: "):
+            raise SystemExit("Parollar mos emas.")
+    if not re.fullmatch(r"[a-z0-9_.]{3,30}", username):
         raise SystemExit("Hisob nomi noto'g'ri.")
     if User.objects.filter(username=username).exists():
-        raise SystemExit("Bu nom band. Mavjud hisob huquqlari avtomatik o'zgartirilmaydi.")
-    password = getpass.getpass("Admin paroli (kamida 10 belgi): ")
-    if password != getpass.getpass("Parolni takrorlang: "):
-        raise SystemExit("Parollar mos emas.")
+        print(f"Admin '{username}' allaqachon mavjud.")
+        return
     validate_user_password(password)
     user = User.objects.create_superuser(username=username,password=password,first_name="Admin")
     code = recovery_code()
@@ -1098,14 +1186,18 @@ def create_admin():
 def main():
     parser = argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("command",nargs="?",default="run",choices=["run","migrate","createadmin","seed-demo","test"])
-    parser.add_argument("--host",default="127.0.0.1")
-    parser.add_argument("--port",type=int,default=8011)
+    default_host = os.environ.get("HOST", "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1")
+    default_port = int(os.environ.get("PORT", 8011))
+    parser.add_argument("--host",default=default_host)
+    parser.add_argument("--port",type=int,default=default_port)
     parser.add_argument("--demo",action="store_true",help="Belgilangan, haqiqiy bo'lmagan namuna yozuvlarini qo'shish")
     args = parser.parse_args()
     if args.command == "test":
         return run_tests()
     migrate_database(verbosity=0)
     if args.demo or args.command == "seed-demo":
+        seed_demo()
+    elif not Station.objects.exists() and not os.environ.get("GEF_NO_DEMO"):
         seed_demo()
     if args.command == "migrate":
         print("Migratsiyalar bajarildi.")
