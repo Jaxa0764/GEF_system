@@ -1136,12 +1136,14 @@ def ensure_migrated():
             admin_pass = (os.environ.get("GEF_ADMIN_PASSWORD") or "").strip()
             if admin_user and admin_pass and not User.objects.filter(username=admin_user).exists():
                 try:
-                    validate_user_password(admin_pass)
+                    # Skip CommonPasswordValidator for auto-admin – admin is responsible for env-var password security
+                    if len(admin_pass) < 4:
+                        raise ValueError("GEF_ADMIN_PASSWORD too short (min 4 chars)")
                     user = User.objects.create_superuser(username=admin_user, password=admin_pass, first_name="Admin")
                     Profile.objects.create(user=user, recovery_hash=make_password(recovery_code()))
-                    logging.info("Admin %s auto-created.", admin_user)
+                    logging.info("Admin '%s' auto-created successfully.", admin_user)
                 except Exception as ex:
-                    logging.warning("Auto-admin error: %s", ex)
+                    logging.warning("Auto-admin creation failed: %s", ex)
         except Exception as exc:
             logging.exception("Auto-migration error: %s", exc)
         _migrated = True

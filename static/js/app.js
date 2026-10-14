@@ -1277,24 +1277,8 @@ function geoFailure(error) {
   }
 }
 async function fetchIpLocation() {
-  try {
-    const res = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(3500) });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.latitude && data.longitude) {
-        return { lat: Number(data.latitude), lng: Number(data.longitude), city: data.city || "Toshkent" };
-      }
-    }
-  } catch {}
-  try {
-    const res = await fetch("https://freeipapi.com/api/json", { signal: AbortSignal.timeout(3500) });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.latitude && data.longitude) {
-        return { lat: Number(data.latitude), lng: Number(data.longitude), city: data.cityName || "Toshkent" };
-      }
-    }
-  } catch {}
+  // IP geolocation removed — it returns inaccurate city-level coordinates
+  // (e.g. Tashkent instead of Fergana). For a navigation app, only real GPS is acceptable.
   return null;
 }
 function locate() {
@@ -1312,27 +1296,11 @@ function locate() {
       resolve(true);
     };
 
-    const tryIpFallback = async (originalErr) => {
-      const ipLoc = await fetchIpLocation();
-      if (ipLoc) {
-        acceptPosition(
-          {
-            coords: { latitude: ipLoc.lat, longitude: ipLoc.lng, accuracy: 2500 },
-            timestamp: Date.now(),
-          },
-          true,
-        );
-        S.address = ipLoc.city;
-        renderLocation();
-        resolve(true);
-      } else {
-        if (originalErr) geoFailure(originalErr);
-        resolve(false);
-      }
-    };
-
     if (!navigator.geolocation) {
-      tryIpFallback();
+      S.geoError = "gps_unavailable";
+      renderLocation();
+      toast(t("gps_unavailable"), true);
+      resolve(false);
       return;
     }
 
@@ -1342,8 +1310,11 @@ function locate() {
       triedFallback = true;
       navigator.geolocation.getCurrentPosition(
         handleSuccess,
-        (err) => tryIpFallback(err),
-        { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
+        (err) => {
+          geoFailure(err);
+          resolve(false);
+        },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
       );
     };
 
@@ -1351,13 +1322,15 @@ function locate() {
       handleSuccess,
       (error) => {
         if (error.code === 1) {
+          // Permission denied — show error immediately
           geoFailure(error);
           resolve(false);
         } else {
+          // Timeout or unavailable — try low-accuracy GPS before giving up
           fallbackLowAccuracy();
         }
       },
-      { enableHighAccuracy: true, timeout: 6000, maximumAge: 60000 },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
     );
   });
 }
