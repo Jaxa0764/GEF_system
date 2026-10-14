@@ -181,7 +181,20 @@ from django.db.migrations.recorder import MigrationRecorder
 from django.db.migrations.state import ModelState, ProjectState
 from django.db.models import Avg, Count, Q
 from django.http import FileResponse, HttpResponse, JsonResponse
-from django.urls import path
+from django.urls import path, re_path
+
+
+urlpatterns = [
+    path("", index),
+    path("api/<path:endpoint>", api),
+    path("avatar/<int:uid>", avatar),
+    path("static/<path:filename>", static_asset),
+    # Catch‑all for client‑side routes (admin, profile, etc.)
+    re_path(r"^.*$", index),
+]
+
+]
+
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 
@@ -1112,7 +1125,7 @@ def static_asset(request, filename):
     return response
 
 
-    path("", index),
+
     path("api/<path:endpoint>", api),
     path("avatar/<int:uid>", avatar),
     path("static/<path:filename>", static_asset),
