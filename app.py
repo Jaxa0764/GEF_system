@@ -184,7 +184,7 @@ from django.http import FileResponse, HttpResponse, JsonResponse
 from django.urls import path, re_path
 
 
-urlpatterns = [
+
     path("", index),
     path("api/<path:endpoint>", api),
     path("avatar/<int:uid>", avatar),
@@ -1126,11 +1126,15 @@ def static_asset(request, filename):
 
 
 
+urlpatterns = [
+    path("", index),
     path("api/<path:endpoint>", api),
     path("avatar/<int:uid>", avatar),
     path("static/<path:filename>", static_asset),
     # Catch‑all for client‑side routes (admin, profile, etc.)
     re_path(r"^.*$", index),
+]
+
 _migrated = False
 _migrate_lock = threading.Lock()
 
