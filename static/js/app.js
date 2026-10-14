@@ -364,9 +364,9 @@ const WORDS = {
     "3–30 characters: a–z, 0–9, _ or .",
   ],
   password_hint: [
-    "Kamida 10 belgi. Oddiy yoki faqat raqamlardan iborat parol bo‘lmasin.",
-    "Минимум 10 символов. Не используйте простой пароль или только цифры.",
-    "At least 10 characters. Avoid common or all-numeric passwords.",
+    "Kamida 8 belgi va kamida 1 ta harf bo‘lsin.",
+    "Минимум 8 символов и хотя бы 1 буква.",
+    "At least 8 characters and at least 1 letter.",
   ],
   forgot_password: [
     "Parol esdan chiqdimi?",
@@ -529,9 +529,14 @@ const WORDS = {
     "Check the data. Fields are invalid or incomplete.",
   ],
   password_invalid: [
-    "Parol talablariga rioya qiling: kamida 10 belgi, oddiy yoki faqat raqamli emas.",
-    "Пароль: минимум 10 символов, не простой и не только из цифр.",
-    "Use at least 10 characters, avoiding common or all-numeric passwords.",
+    "Parol talablariga rioya qiling: kamida 8 belgi va kamida 1 ta harf.",
+    "Пароль: минимум 8 символов и хотя бы 1 буква.",
+    "Password must be at least 8 characters with at least 1 letter.",
+  ],
+  password_letter_required: [
+    "Parolda kamida bitta harf bo‘lishi shart.",
+    "Пароль должен содержать хотя бы одну букву.",
+    "Password must contain at least one letter.",
   ],
   username_invalid: [
     "Hisob nomi: 3–30 belgi, a–z, 0–9, _ yoki .",
@@ -1271,6 +1276,27 @@ function geoFailure(error) {
     renderNavigation();
   }
 }
+async function fetchIpLocation() {
+  try {
+    const res = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(3500) });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.latitude && data.longitude) {
+        return { lat: Number(data.latitude), lng: Number(data.longitude), city: data.city || "Toshkent" };
+      }
+    }
+  } catch {}
+  try {
+    const res = await fetch("https://freeipapi.com/api/json", { signal: AbortSignal.timeout(3500) });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.latitude && data.longitude) {
+        return { lat: Number(data.latitude), lng: Number(data.longitude), city: data.cityName || "Toshkent" };
+      }
+    }
+  } catch {}
+  return null;
+}
 function locate() {
   if (!window.isSecureContext) {
     S.geoError = "gps_insecure";
@@ -1278,37 +1304,51 @@ function locate() {
     toast(t("gps_insecure"), true);
     return Promise.resolve(false);
   }
-  if (!navigator.geolocation) {
-    S.geoError = "gps_unavailable";
-    renderLocation();
-    return Promise.resolve(false);
-  }
   $("location-text").textContent = t("locating");
   return new Promise((resolve) => {
+    const handleSuccess = (position) => {
+      acceptPosition(position, true);
+      watchPosition();
+      resolve(true);
+    };
+
+    const tryIpFallback = async (originalErr) => {
+      const ipLoc = await fetchIpLocation();
+      if (ipLoc) {
+        acceptPosition(
+          {
+            coords: { latitude: ipLoc.lat, longitude: ipLoc.lng, accuracy: 2500 },
+            timestamp: Date.now(),
+          },
+          true,
+        );
+        S.address = ipLoc.city;
+        renderLocation();
+        resolve(true);
+      } else {
+        if (originalErr) geoFailure(originalErr);
+        resolve(false);
+      }
+    };
+
+    if (!navigator.geolocation) {
+      tryIpFallback();
+      return;
+    }
+
     let triedFallback = false;
     const fallbackLowAccuracy = () => {
       if (triedFallback) return;
       triedFallback = true;
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          acceptPosition(position, true);
-          watchPosition();
-          resolve(true);
-        },
-        (error) => {
-          geoFailure(error);
-          resolve(false);
-        },
-        { enableHighAccuracy: false, timeout: 12000, maximumAge: 300000 },
+        handleSuccess,
+        (err) => tryIpFallback(err),
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
       );
     };
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        acceptPosition(position, true);
-        watchPosition();
-        resolve(true);
-      },
+      handleSuccess,
       (error) => {
         if (error.code === 1) {
           geoFailure(error);
@@ -1317,7 +1357,7 @@ function locate() {
           fallbackLowAccuracy();
         }
       },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+      { enableHighAccuracy: true, timeout: 6000, maximumAge: 60000 },
     );
   });
 }
@@ -1808,6 +1848,9 @@ async function submitRating() {
 }
 
 function field(label, name, type = "text", value = "", extra = "") {
+  if (type === "password") {
+    return `<div class="field"><label for="f-${name}">${esc(t(label))}</label><div class="password-input-wrap"><input id="f-${name}" name="${name}" type="password" value="${esc(value)}" ${extra}><button type="button" class="password-toggle-btn" data-action="toggle-password" data-target="f-${name}" aria-label="Toggle password">${icon("eye")}</button></div></div>`;
+  }
   return `<div class="field"><label for="f-${name}">${esc(t(label))}</label><input id="f-${name}" name="${name}" type="${type}" value="${esc(value)}" ${extra}></div>`;
 }
 function renderProfile() {
@@ -1848,10 +1891,10 @@ function renderProfile() {
 }
 function authForm() {
   if (S.authView === "recover") {
-    return `<form id="recover-form">${field("username", "username", "text", "", 'required minlength="3" maxlength="30" autocomplete="username"')}${field("recovery_code", "recovery_code", "text", "", 'required maxlength="100" autocomplete="off"')}${field("new_password", "password", "password", "", 'required minlength="10" maxlength="128" autocomplete="new-password"')}<small>${esc(t("password_hint"))}</small><p class="form-error" id="auth-error"></p><button class="btn primary full" type="submit">${esc(t("recover"))}</button></form>`;
+    return `<form id="recover-form">${field("username", "username", "text", "", 'required minlength="3" maxlength="30" autocomplete="username"')}${field("recovery_code", "recovery_code", "text", "", 'required maxlength="100" autocomplete="off"')}${field("new_password", "password", "password", "", 'required minlength="8" maxlength="128" autocomplete="new-password"')}<small>${esc(t("password_hint"))}</small><p class="form-error" id="auth-error"></p><button class="btn primary full" type="submit">${esc(t("recover"))}</button></form>`;
   }
   if (S.authView === "register") {
-    return `<form id="register-form"><div class="form-grid">${field("first_name", "first_name", "text", "", 'required maxlength="50" autocomplete="given-name"')}${field("last_name", "last_name", "text", "", 'required maxlength="50" autocomplete="family-name"')}</div>${field("username", "username", "text", "", 'required pattern="[a-zA-Z0-9_.]{3,30}" minlength="3" maxlength="30" autocomplete="username"')}<small style="display:block;margin-top:-10px;margin-bottom:15px">${esc(t("username_hint"))}</small>${field("password", "password", "password", "", 'required minlength="10" maxlength="128" autocomplete="new-password"')}${field("confirm_password", "confirm_password", "password", "", 'required minlength="10" maxlength="128" autocomplete="new-password"')}<small>${esc(t("password_hint"))}</small><label class="check"><input name="confirmed" type="checkbox" required>${esc(t("confirmed"))}</label><p class="form-error" id="auth-error"></p><button class="btn primary full" id="register-button" type="submit" disabled>${esc(t("register"))}</button></form>`;
+    return `<form id="register-form"><div class="form-grid">${field("first_name", "first_name", "text", "", 'required maxlength="50" autocomplete="given-name"')}${field("last_name", "last_name", "text", "", 'required maxlength="50" autocomplete="family-name"')}</div>${field("username", "username", "text", "", 'required pattern="[a-zA-Z0-9_.]{3,30}" minlength="3" maxlength="30" autocomplete="username"')}<small style="display:block;margin-top:-10px;margin-bottom:15px">${esc(t("username_hint"))}</small>${field("password", "password", "password", "", 'required minlength="8" maxlength="128" autocomplete="new-password"')}${field("confirm_password", "confirm_password", "password", "", 'required minlength="8" maxlength="128" autocomplete="new-password"')}<small>${esc(t("password_hint"))}</small><label class="check"><input name="confirmed" type="checkbox" required>${esc(t("confirmed"))}</label><p class="form-error" id="auth-error"></p><button class="btn primary full" id="register-button" type="submit" disabled>${esc(t("register"))}</button></form>`;
   }
   return `<form id="login-form">${field("username", "username", "text", "", 'required maxlength="30" autocomplete="username"')}${field("password", "password", "password", "", 'required maxlength="128" autocomplete="current-password"')}<p class="form-error" id="auth-error"></p><button class="btn primary full" type="submit">${esc(t("sign_in"))}</button><button class="filter-clear full" style="margin-top:15px" type="button" data-action="auth-tab" data-view="recover">${esc(t("forgot_password"))}</button></form>`;
 }
@@ -1859,14 +1902,18 @@ function validateRegistration() {
   const form = $("register-form");
   if (!form) return;
   const d = new FormData(form);
+  const pass = d.get("password") || "";
+  const confirm = d.get("confirm_password") || "";
   const valid =
     form.checkValidity() &&
-    d.get("password") === d.get("confirm_password") &&
-    !/^\d+$/.test(d.get("password") || "");
+    pass === confirm &&
+    pass.length >= 8 &&
+    /[a-zA-Z]/.test(pass) &&
+    !/^\d+$/.test(pass);
   $("register-button").disabled = !valid;
 }
 function accountForm() {
-  return `<div class="row wrap" style="margin:15px 0 25px">${avatarHTML(S.user)}<label class="btn small">${esc(t("upload_photo"))}<input type="file" id="avatar-input" accept="image/jpeg,image/png,image/webp" hidden></label><small>${esc(t("photo_hint"))}</small></div><form id="account-form">${field("username", "account_username", "text", S.user.username, "readonly")}<div class="form-grid">${field("first_name", "first_name", "text", S.user.first_name, 'required maxlength="50"')}${field("last_name", "last_name", "text", S.user.last_name, 'required maxlength="50"')}</div><button class="btn primary" type="submit">${esc(t("save"))}</button></form><hr style="border:0;border-top:1px solid var(--line);margin:27px 0"><h3>${esc(t("change_password"))}</h3><form id="password-form">${field("current_password", "current_password", "password", "", 'required autocomplete="current-password"')}${field("new_password", "password", "password", "", 'required minlength="10" maxlength="128" autocomplete="new-password"')}<small>${esc(t("password_hint"))}</small><div style="margin-top:16px"><button class="btn primary" type="submit">${esc(t("change_password"))}</button><button class="btn" style="margin-top:8px" type="button" data-action="new-recovery">${esc(t("new_recovery"))}</button></div><p class="form-error" id="account-error"></p></form>`;
+  return `<div class="row wrap" style="margin:15px 0 25px">${avatarHTML(S.user)}<label class="btn small">${esc(t("upload_photo"))}<input type="file" id="avatar-input" accept="image/jpeg,image/png,image/webp" hidden></label><small>${esc(t("photo_hint"))}</small></div><form id="account-form">${field("username", "account_username", "text", S.user.username, "readonly")}<div class="form-grid">${field("first_name", "first_name", "text", S.user.first_name, 'required maxlength="50"')}${field("last_name", "last_name", "text", S.user.last_name, 'required maxlength="50"')}</div><button class="btn primary" type="submit">${esc(t("save"))}</button></form><hr style="border:0;border-top:1px solid var(--line);margin:27px 0"><h3>${esc(t("change_password"))}</h3><form id="password-form">${field("current_password", "current_password", "password", "", 'required autocomplete="current-password"')}${field("new_password", "password", "password", "", 'required minlength="8" maxlength="128" autocomplete="new-password"')}<small>${esc(t("password_hint"))}</small><div style="margin-top:16px"><button class="btn primary" type="submit">${esc(t("change_password"))}</button><button class="btn" style="margin-top:8px" type="button" data-action="new-recovery">${esc(t("new_recovery"))}</button></div><p class="form-error" id="account-error"></p></form>`;
 }
 function supportForm() {
   return `<form id="support-form"><div class="field"><label for="support-message">${esc(t("message"))}</label><textarea id="support-message" name="message" required maxlength="4000"></textarea></div><button class="btn primary" type="submit">${esc(t("send"))}</button><p class="form-error" id="support-error"></p></form><h3 style="margin:30px 0 15px">${esc(t("my_requests"))}</h3><div id="support-items"><span class="spinner"></span></div>`;
@@ -2408,6 +2455,14 @@ const ACTIONS = {
   "retry-route": async (el) => {
     closeModal();
     await startNavigation(Number(el.dataset.id));
+  },
+  "toggle-password": (btn) => {
+    const targetId = btn.dataset.target;
+    const input = $(targetId);
+    if (!input) return;
+    const isPass = input.type === "password";
+    input.type = isPass ? "text" : "password";
+    btn.innerHTML = icon(isPass ? "eye-off" : "eye");
   },
   locate: () => locate(),
   manual: () => openPicker("origin"),

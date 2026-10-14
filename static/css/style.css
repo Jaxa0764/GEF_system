@@ -879,6 +879,39 @@ small {
 .field input[readonly] {
   color: var(--muted);
 }
+.password-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.password-input-wrap input {
+  padding-right: 44px !important;
+}
+.password-toggle-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: color 0.15s, background-color 0.15s;
+}
+.password-toggle-btn:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+.password-toggle-btn .icon {
+  width: 20px;
+  height: 20px;
+}
 .check {
   display: flex;
   align-items: center;

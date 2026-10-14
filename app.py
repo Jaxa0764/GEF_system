@@ -163,7 +163,7 @@ settings.configure(
     DATA_UPLOAD_MAX_MEMORY_SIZE=3 * 1024 * 1024,
     CACHES={"default": ({"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": cache_url}
                          if cache_url else {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "gef"})},
-    AUTH_PASSWORD_VALIDATORS=[{"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 10}},
+    AUTH_PASSWORD_VALIDATORS=[{"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
                               {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
                               {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"}],
 )
@@ -388,8 +388,10 @@ def recovery_code():
     return "-".join(secrets.token_hex(3) for _ in range(4))
 
 def validate_user_password(value, user=None):
-    if not isinstance(value, str) or len(value) > 128:
+    if not isinstance(value, str) or len(value) < 8 or len(value) > 128:
         fail("password_invalid")
+    if not re.search(r"[a-zA-Z]", value):
+        fail("password_letter_required")
     try:
         validate_password(value, user)
     except ValidationError:
@@ -1168,7 +1170,7 @@ def create_admin():
             raise SystemExit("Hisob nomi noto'g'ri.")
         if User.objects.filter(username=username).exists():
             raise SystemExit("Bu nom band. Mavjud hisob huquqlari avtomatik o'zgartirilmaydi.")
-        password = getpass.getpass("Admin paroli (kamida 10 belgi): ")
+        password = getpass.getpass("Admin paroli (kamida 8 belgi): ")
         if password != getpass.getpass("Parolni takrorlang: "):
             raise SystemExit("Parollar mos emas.")
     if not re.fullmatch(r"[a-z0-9_.]{3,30}", username):
