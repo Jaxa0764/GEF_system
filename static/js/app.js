@@ -1284,27 +1284,59 @@ function locate() {
     return Promise.resolve(false);
   }
   $("location-text").textContent = t("locating");
-  return new Promise((resolve) =>
+  return new Promise((resolve) => {
+    let triedFallback = false;
+    const fallbackLowAccuracy = () => {
+      if (triedFallback) return;
+      triedFallback = true;
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          acceptPosition(position, true);
+          watchPosition();
+          resolve(true);
+        },
+        (error) => {
+          geoFailure(error);
+          resolve(false);
+        },
+        { enableHighAccuracy: false, timeout: 12000, maximumAge: 300000 },
+      );
+    };
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
         acceptPosition(position, true);
+        watchPosition();
         resolve(true);
       },
       (error) => {
-        geoFailure(error);
-        resolve(false);
+        if (error.code === 1) {
+          geoFailure(error);
+          resolve(false);
+        } else {
+          fallbackLowAccuracy();
+        }
       },
-      { enableHighAccuracy: true, timeout: 18000, maximumAge: 0 },
-    ),
-  );
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+    );
+  });
 }
 function watchPosition() {
   if (S.watchId !== null) navigator.geolocation.clearWatch(S.watchId);
-  if (!navigator.geolocation) return;
+  if (!navigator.geolocation || !window.isSecureContext) return;
   S.watchId = navigator.geolocation.watchPosition(
     (p) => acceptPosition(p),
-    geoFailure,
-    { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 },
+    (err) => {
+      if (err.code === 2 || err.code === 3) {
+        if (S.watchId !== null) navigator.geolocation.clearWatch(S.watchId);
+        S.watchId = navigator.geolocation.watchPosition(
+          (p) => acceptPosition(p),
+          geoFailure,
+          { enableHighAccuracy: false, maximumAge: 10000, timeout: 30000 },
+        );
+      }
+    },
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
   );
 }
 function distance(a, b, c, d) {

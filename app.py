@@ -750,8 +750,8 @@ def api_dispatch(request, endpoint):
         nav_owner(request)
         return {"user":user_data(request.user), "config":{
             "tile_light":os.environ.get("GEF_TILE_LIGHT","https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
-            "tile_dark":os.environ.get("GEF_TILE_DARK","https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"),
-            "attribution":os.environ.get("GEF_TILE_ATTRIBUTION") or '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            "tile_dark":os.environ.get("GEF_TILE_DARK") or os.environ.get("GEF_TILE_LIGHT","https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
+            "attribution":os.environ.get("GEF_TILE_ATTRIBUTION") or '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             "ai_mode":"provider" if os.environ.get("GEF_AI_KEY") and os.environ.get("GEF_AI_MODEL") else "local",
             "poll_seconds":15}, "demo":Station.objects.filter(published=True,demo=True).exists()}
     if endpoint == "auth/register" and method == "POST":
